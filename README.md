@@ -12,7 +12,7 @@ For better project management, we have used [UV](https://docs.astral.sh/uv/). We
 git clone https://github.com/astronish16/DBM.git
 cd DBM
 ```
-2. Install dependencies:
+2. Install dependencies:\
 Required dependencies are listed in [pyproject.toml](pyproject.toml). Following command will create virtual enviroment for this project inside the directory and install all the dependecies.
 ```
 uv sync

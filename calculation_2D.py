@@ -90,7 +90,7 @@ class DBM2D:
         self.target_name = target_name
         self.Phi_target, self.r_target = dbm.position(target_name, time_utc)
         self.r1 = ((self.r_target * u.au).to(u.km)).value
-        ic(self.r1)
+        ic(self.r1, self.Phi_target)
 
         self.Omega = Omega
         self.Phi_CME = dbm.Phi_Correction(Phi_CME, time_utc)
@@ -234,23 +234,54 @@ class DBM2D:
             ic(t_arrival_UTC)
 
             # Making plot
-            rvt_plot = dbm.PDBM_2D_RVT_plot(
-                self.time_utc,
+            if Hits == 0:
+                # Making plot
+                rvt_plot = dbm.PDBM_RVT_plot(
+                    self.time_utc,
+                    T_array,
+                    self.r0,
+                    V0_array,
+                    gamma_array,
+                    w_array,
+                    self.r_target,
+                    tdate,
+                )
+                T_PDF_plot = dbm.TT_plot(T_array)
+                V_PDF_Plot = dbm.V_plot(V_array)
+            else:
+                rvt_plot = dbm.PDBM_2D_RVT_plot(
+                    self.time_utc,
+                    T_array,
+                    self.r0,
+                    V0_array,
+                    gamma_array,
+                    w_array,
+                    self.r_target,
+                    tdate,
+                    Omega_array,
+                    Phi_CME_array,
+                    self.Phi_target,
+                    self.cone_type,
+                    self.kinematic,
+                )
+                T_PDF_plot = dbm.TT_plot(T_array)
+                V_PDF_Plot = dbm.V_plot(V_array)
+
+            cme_plot = dbm.setup_heliosphere(
+                T_arrival_UTC,
+                self.r_target,
                 T_array,
                 self.r0,
                 V0_array,
                 gamma_array,
                 w_array,
-                self.r_target,
-                tdate,
                 Omega_array,
                 Phi_CME_array,
                 self.Phi_target,
                 self.cone_type,
                 self.kinematic,
+                self.P_DBM,
             )
-            T_PDF_plot = dbm.TT_plot(T_array)
-            V_PDF_Plot = dbm.V_plot(V_array)
 
             results = {
                 "Transit_time_mean": T_mean,
@@ -266,6 +297,7 @@ class DBM2D:
                 "w_median": W_median,
                 "gamma_median": G_median,
                 "Probability of Arrival": Probability_of_Arrival,
+                "Heliosphere": cme_plot,
             }
 
         elif self.auto_dbm == True and self.P_DBM == False:
@@ -345,13 +377,11 @@ class DBM2D:
             }
 
         elif self.auto_dbm == False and self.P_DBM == True:
-            w_array = np.random.normal(self.w, self.dw / 3.0, self.N)
+            w_array = np.random.normal(self.w, self.dw, self.N)
             gamma_array = np.clip(
-                np.random.normal(
-                    self.gamma * 1.0e-7, self.dgamma * 1.0e-7 / 3.0, self.N
-                ),
-                1.0e-15,
-                3.0e-2,
+                np.random.normal(self.gamma, self.dgamma, self.N),
+                1.0e-9,
+                3.0e-7,
             )
             T_array, V_array, Hits, Miss, V0_array, Omega_array, Phi_CME_array = (
                 dbm.PDBM_2D(
@@ -388,23 +418,38 @@ class DBM2D:
             ic(t_arrival_UTC)
 
             # Making plot
-            rvt_plot = dbm.PDBM_2D_RVT_plot(
-                self.time_utc,
-                T_array,
-                self.r0,
-                V0_array,
-                gamma_array,
-                w_array,
-                self.r_target,
-                tdate,
-                Omega_array,
-                Phi_CME_array,
-                self.Phi_target,
-                self.cone_type,
-                self.kinematic,
-            )
-            T_PDF_plot = dbm.TT_plot(T_array)
-            V_PDF_Plot = dbm.V_plot(V_array)
+            if Hits == 0:
+                # Making plot
+                rvt_plot = dbm.PDBM_RVT_plot(
+                    self.time_utc,
+                    T_array,
+                    self.r0,
+                    V0_array,
+                    gamma_array,
+                    w_array,
+                    self.r_target,
+                    tdate,
+                )
+                T_PDF_plot = dbm.TT_plot(T_array)
+                V_PDF_Plot = dbm.V_plot(V_array)
+            else:
+                rvt_plot = dbm.PDBM_2D_RVT_plot(
+                    self.time_utc,
+                    T_array,
+                    self.r0,
+                    V0_array,
+                    gamma_array,
+                    w_array,
+                    self.r_target,
+                    tdate,
+                    Omega_array,
+                    Phi_CME_array,
+                    self.Phi_target,
+                    self.cone_type,
+                    self.kinematic,
+                )
+                T_PDF_plot = dbm.TT_plot(T_array)
+                V_PDF_Plot = dbm.V_plot(V_array)
 
             results = {
                 "Transit_time_mean": T_mean,
@@ -484,6 +529,20 @@ class DBM2D:
                 )
 
             # Getting Plots
+            cme_plot = dbm.setup_heliosphere(
+                T_arrival_UTC,
+                self.r_target,
+                T1,
+                self.r0,
+                self.v0,
+                gamma,
+                w,
+                self.Omega,
+                self.Phi_CME,
+                self.Phi_target,
+                self.cone_type,
+                self.kinematic,
+            )
 
             results = {
                 "Transit_time_mean": T1,
@@ -495,6 +554,7 @@ class DBM2D:
                 "w_median": w,
                 "gamma_median": gamma,
                 "Hit": Hit,
+                "Heliosphere": cme_plot,
             }
 
         return results
@@ -506,23 +566,24 @@ if __name__ == "__main__":
         time_utc=datetime(2022, 12, 1, 12, 23),
         r0=20,
         v0=1000,
-        Omega=80,
-        Phi_CME=0,
-        cone_type="TC",
+        Omega=30,
+        Phi_CME=10,
+        cone_type="IC",
         Kinematic="SSE",
         target_name="Earth",
         P_DBM=True,
         auto_dbm=True,
         wind_type="Slow",
         w=400,
-        gamma=0.2e-7,
+        gamma=0.7e-7,
         dt=20,
         dr0=1,
         dv0=100,
         dw=None,
-        dgamma=None,
+        dgamma=0.1e-7,
     )
     A = downloader.P_DBM_run()
     ic(A)
 
+    dbm.show_plots(A["Heliosphere"])
     dbm.show_plots(A["RVT_plot"])

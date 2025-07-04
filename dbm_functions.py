@@ -141,10 +141,19 @@ def auto_w_gamma_func(PDBM, wind_type, N):
 
     gamma_array = np.clip(
         sts.lognorm.rvs(
-            0.6518007540612114, -2.2727287735377082e-08, 9.425812152200486e-08, size=N
+            0.6518007540612114 / 2.0,
+            -2.2727287735377082e-08,
+            9.425812152200486e-08,
+            size=N,
         ),
-        1.0e-08,
+        1.0e-09,
         3.0e-7,
+    )
+    ic(
+        np.max(gamma_array),
+        np.mean(gamma_array),
+        np.median(gamma_array),
+        np.std(gamma_array),
     )
 
     if PDBM == True:
@@ -240,7 +249,7 @@ def DBM_RVT_plot(time_utc, TT, r0, v0, gamma, w, r_target, tdate):
 
     # Save the plot to an in-memory buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)  # Move to the start of the buffer
     plt.close()  # Close the plot to free resources
 
@@ -314,7 +323,7 @@ def PDBM_RVT_plot(
 
     # Save the plot to an in-memory buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)  # Move to the start of the buffer
     plt.close()  # Close the plot to free resources
 
@@ -346,7 +355,7 @@ def TT_plot(T):
 
     # Save the plot to an in-memory buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)  # Move to the start of the buffer
     plt.close()  # Close the plot to free resources
 
@@ -377,7 +386,7 @@ def V_plot(V):
 
     # Save the plot to an in-memory buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)  # Move to the start of the buffer
     plt.close()  # Close the plot to free resources
 
@@ -666,22 +675,29 @@ def DBM_2D_RVT_plot(
     r_target = (r_target * u.au).to(u.R_sun).value
 
     # This is main part to define which kind of initial transformation has to be used.
-    if kinematic == "SSE" or "Slef-Similar Expansion":
+    if kinematic in ["SSE", "Self-Similar Expansion"]:
         R, V = RV(t_ary, r0, v0, gamma, w)
         R = (R * u.km).to(u.R_sun).value
 
-        if cone_geometry == "IC" or "Ice-Cream Cone":
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
             R_ary, V_ary = IC_RV_alpha(omega, alpha, R, V)
-        elif cone_geometry == "TC" or "Tangential Cone":
+        elif cone_geometry in ["TC", "Tangential Cone"]:
             R_ary, V_ary = TC_RV_alpha(omega, alpha, R, V)
+        elif cone_geometry in ["CC", "Concentric Cone"]:
+            R_ary = R.copy()
+            V_ary = V.copy()
+            ic(R_ary, V_ary)
+
         else:
             raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
 
-    elif kinematic == "FCE" or "Flattening Cone Evolution":
-        if cone_geometry == "IC" or "Ice-Cream Cone":
+    elif kinematic in ["FCE", "Flattening Cone Evolution"]:
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
             R0_a, V0_a = IC_RV_alpha(omega, alpha, r0, v0)
-        elif cone_geometry == "TC" or "Tangential Cone":
+        elif cone_geometry in ["TC", "Tangential Cone"]:
             R0_a, V0_a = TC_RV_alpha(omega, alpha, r0, v0)
+        elif cone_geometry in ["CC", "Concentric Cone"]:
+            R0_a, V0_a = r0, v0
         else:
             raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
 
@@ -724,7 +740,7 @@ def DBM_2D_RVT_plot(
 
     # Save to buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)
     plt.close()
 
@@ -764,40 +780,49 @@ def PDBM_2D_RVT_plot(
     Time = [time_utc + timedelta(seconds=i) for i in t_ary]
     r_target = (r_target * u.au).to(u.R_sun).value
     alpha_array = np.abs(phi_cme_array - phi_target)
+    # ensure each alpha[i] ≤ omega_array[i]
+    # alpha_array = np.minimum(alpha_array, omega_array)
 
     i_array = np.arange(0, len(v0_array), 1)
     R_matrix = np.zeros((len(v0_array), len(t_ary)))
     V_matrix = np.zeros((len(v0_array), len(t_ary)))
 
     # This is main part to define which kind of initial transformation has to be used.
-    if kinematic == "SSE" or "Slef-Similar Expansion":
+    if kinematic in ["SSE", "Self-Similar Expansion"]:
         for v0, w, g, omeg, alph, i in zip(
             v0_array, w_array, gamma_array, omega_array, alpha_array, i_array
         ):
             R, V = RV(t_ary, r0, v0, g, w)
             R = (R * u.km).to(u.R_sun).value
 
-            if cone_geometry == "IC" or "Ice-Cream Cone":
+            if cone_geometry in ["IC", "Ice-Cream Cone"]:
                 R_ary, V_ary = IC_RV_alpha(omeg, alph, R, V)
-            elif cone_geometry == "TC" or "Tangential Cone":
+                # ic(V_ary)
+            elif cone_geometry in ["TC", "Tangential Cone"]:
                 R_ary, V_ary = TC_RV_alpha(omeg, alph, R, V)
+            elif cone_geometry in ["CC", "Concentric Cone"]:
+                R_ary = R.copy()
+                V_ary = V.copy()
+                # ic(V_ary)
             else:
                 raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
 
             R_matrix[i], V_matrix[i] = R_ary, V_ary
 
-    elif kinematic == "FCE" or "Flattening Cone Evolution":
+    elif kinematic in ["FCE", "Flattening Cone Evolution"]:
         for v0, w, g, omeg, alph, i in zip(
             v0_array, w_array, gamma_array, omega_array, alpha_array, i_array
         ):
-            if cone_geometry == "IC" or "Ice-Cream Cone":
+            if cone_geometry in ["IC", "Ice-Cream Cone"]:
                 R0_a, V0_a = IC_RV_alpha(omeg, alph, r0, v0)
-            elif cone_geometry == "TC" or "Tangential Cone":
+            elif cone_geometry in ["TC", "Tangential Cone"]:
                 R0_a, V0_a = TC_RV_alpha(omeg, alph, r0, v0)
+            elif cone_geometry in ["CC", "Concentric Cone"]:
+                R0_a, V0_a = r0, v0
             else:
                 raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
 
-            R, V = RV(t_ary, R0_a, V0_a, gamma, w)
+            R, V = RV(t_ary, R0_a, V0_a, g, w)
             R_ary, V_ary = (R * u.km).to(u.R_sun).value, V
             R_matrix[i], V_matrix[i] = R_ary, V_ary
 
@@ -846,7 +871,7 @@ def PDBM_2D_RVT_plot(
 
     # Save to buffer
     buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format="png", dpi=300, bbox_inches="tight")
     buffer.seek(0)
     plt.close()
 
@@ -1122,21 +1147,23 @@ def DBM_2D(r0, r1, v0, gamma, w, omega, phi_cme, phi_target, cone_geometry, kine
     # angle at which we have to perfrom (P-)DBM calculation
     alpha = np.abs(phi_target - phi_cme)
     if kinematic == "SSE" or "Self-Similar Expansion":
-        if cone_geometry == "IC" or "Ice-Cream Cone":
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
             R1_apex = IC_R_alpha_inv(omega, alpha, r1)
             TT, V1_apex = DBM(r0, R1_apex, v0, gamma, w)
             _, V1 = IC_RV_alpha(omega, alpha, R1_apex, V1_apex)
-        elif cone_geometry == "TC" or "Tangential Cone":
+        elif cone_geometry in ["TC", "Tangential Cone"]:
             R1_apex = TC_R_alpha_inv(omega, alpha, r1)
             TT, V1_apex = DBM(r0, R1_apex, v0, gamma, w)
             _, V1 = TC_RV_alpha(omega, alpha, R1_apex, V1_apex)
+        elif cone_geometry in ["CC", "Concentric Cone"]:
+            TT, V1 = DBM(r0, r1, v0, gamma, w)
         else:
             raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
 
-    elif kinematic == "FCE" or "Flattening Cone Evolution":
-        if cone_geometry == "IC" or "Ice-Cream Cone":
+    elif kinematic in ["FCE", "Flattening Cone Evolution"]:
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
             r0_a, v0_a = IC_RV_alpha(omega, alpha, r0, v0)
-        elif cone_geometry == "TC" or "Tangential Cone":
+        elif cone_geometry in ["TC", "Tangential Cone"]:
             r0_a, v0_a = TC_RV_alpha(omega, alpha, r0, v0)
         else:
             raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
@@ -1212,6 +1239,8 @@ def PDBM_2D(
     # Arrays to store Output
     TT_array = np.full(N, np.nan)
     V_array = np.full(N, np.nan)
+    TT_miss_array = np.full(N, np.nan)
+    V_miss_array = np.full(N, np.nan)
 
     Hits = 0
     Miss = 0
@@ -1238,18 +1267,38 @@ def PDBM_2D(
             TT_array[i] = TT_array[i] + t0_array[i]
         else:
             Miss = Miss + 1
+            TT_miss_array[i], V_miss_array[i] = DBM(
+                r0_array[i],
+                r1_array[i],
+                v0_array[i],
+                gamma_array[i],
+                wind_array[i],
+            )
+            TT_miss_array[i] = TT_miss_array[i] + t0_array[i]
 
-    valid_mask = ~np.isnan(TT_array)
+    if Hits == 0:
+        valid_mask = ~np.isnan(TT_miss_array)
+        return (
+            TT_miss_array[valid_mask],
+            V_miss_array[valid_mask],
+            Hits,
+            Miss,
+            v0_array[valid_mask],
+            omega_array[valid_mask],
+            phi_cme_array[valid_mask],
+        )
 
-    return (
-        TT_array[valid_mask],
-        V_array[valid_mask],
-        Hits,
-        Miss,
-        v0_array[valid_mask],
-        omega_array[valid_mask],
-        phi_cme_array[valid_mask],
-    )
+    else:
+        valid_mask = ~np.isnan(TT_array)
+        return (
+            TT_array[valid_mask],
+            V_array[valid_mask],
+            Hits,
+            Miss,
+            v0_array[valid_mask],
+            omega_array[valid_mask],
+            phi_cme_array[valid_mask],
+        )
 
 
 # def DBM_Self_Similar_Expansion(r0, r1, v0, gamma, w, omega, alpha):
@@ -1385,3 +1434,358 @@ def position(target, date):
         r_obj = np.nan
 
     return phi_obj, r_obj
+
+
+def CME_edge(tt, r0, v0, gamma, w, omega, phi_cme, cone_geometry, kinematic):
+    tt = tt * 3600
+    rad = np.linspace(phi_cme - omega, phi_cme + omega, num=30, endpoint=True)
+    alphas = rad - phi_cme
+
+    # This is main part to define which kind of initial transformation is used.
+    if kinematic in ["SSE", "Self-Similar Expansion"]:
+        R_apex, _ = RV(tt, r0, v0, gamma, w)
+        # ic((R_apex * u.km).to(u.au).value)
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
+            R_ary, __ = IC_RV_alpha(omega, alphas, R_apex, _)
+        elif cone_geometry in ["TC", "Tangential Cone"]:
+            R_ary, __ = TC_RV_alpha(omega, alphas, R_apex, _)
+        elif cone_geometry in ["CC", "Concentric Cone"]:
+            R_ary = np.full(len(rad), R_apex)
+        else:
+            raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
+    elif kinematic in ["FCE", "Flattening Cone Evolution"]:
+        R_ary = []
+        if cone_geometry in ["IC", "Ice-Cream Cone"]:
+            for a in alphas:
+                R0_a, V0_a = IC_RV_alpha(omega, a, r0, v0)
+                r, _ = RV(tt, R0_a, V0_a, gamma, w)
+                R_ary.append(r)
+        elif cone_geometry in ["TC", "Tangential Cone"]:
+            for a in alphas:
+                R0_a, V0_a = TC_RV_alpha(omega, a, r0, v0)
+                r, _ = RV(tt, R0_a, V0_a, gamma, w)
+                R_ary.append(r)
+        elif cone_geometry in ["CC", "Concentric Cone"]:
+            R_ary = np.full(len(rad), R_apex)
+
+        else:
+            raise ValueError(f"Unknown Cone Geometry: {cone_geometry}")
+
+    R_ary = np.array(R_ary)
+    R_edge = (R_ary * u.km).to(u.au).value
+    angle_rad = np.deg2rad(rad)
+    return angle_rad, R_edge
+
+
+def CME_edge_ensemble(
+    tt_array,
+    r0,
+    v0_array,
+    gamma_array,
+    w_array,
+    omega_array,
+    phi_cme_array,
+    cone_geometry,
+    kinematic,
+):
+    num_samples = 1000
+    full_size = len(tt_array)
+    assert all(
+        len(arr) == full_size
+        for arr in [v0_array, gamma_array, w_array, omega_array, phi_cme_array]
+    ), "All input arrays must have same length"
+
+    idx = np.random.choice(full_size, size=num_samples, replace=False)
+    ensemble_edges = []
+    ensemble_angle = []
+
+    for i in idx:
+        tt = tt_array[i]
+        v0 = v0_array[i]
+        gamma = gamma_array[i]
+        w = w_array[i]
+        omega = omega_array[i]
+        phi_cme = phi_cme_array[i]
+
+        angles_rad, R_edge = CME_edge(
+            tt, r0, v0, gamma, w, omega, phi_cme, cone_geometry, kinematic
+        )
+        ensemble_edges.append(R_edge)
+        ensemble_angle.append(angles_rad)
+        # ic(angles_rad)
+
+    ensemble_edges = np.array(ensemble_edges)  # shape: (num_samples, num_angles)
+    ic(len(ensemble_angle))
+    ic(np.shape(ensemble_edges))
+    return ensemble_angle, ensemble_edges
+
+
+def setup_heliosphere(
+    arrival_UTC,
+    r_target,
+    tt,
+    r0,
+    v0,
+    gamma,
+    w,
+    omega,
+    phi_cme,
+    phi_target,
+    cone_geometry,
+    kinematic,
+    pdbm,
+):
+    AJD = Time(arrival_UTC).jd
+    fig = plt.figure(figsize=(12, 10))
+    ax = fig.add_axes([0.1, 0.1, 0.75, 0.75], projection="polar")
+
+    # Planets
+    mercury = Horizons(id="199", location="399", epochs=AJD)
+    mercury_eph = mercury.ephemerides()
+    mercury_hlon = mercury_eph["EclLon"][0]
+    mercury_r = mercury_eph["r"][0]
+    venus = Horizons(id="299", location="399", epochs=AJD)
+    venus_eph = venus.ephemerides()
+    venus_hlon = venus_eph["EclLon"][0]
+    venus_r = venus_eph["r"][0]
+    mars = Horizons(id="499", location="399", epochs=AJD)
+    mars_eph = mars.ephemerides()
+    mars_hlon = mars_eph["EclLon"][0]
+    mars_r = mars_eph["r"][0]
+    jupiter = Horizons(id="599", location="399", epochs=AJD)
+    jupiter_eph = jupiter.ephemerides()
+    jupiter_hlon = jupiter_eph["EclLon"][0]
+    jupiter_r = jupiter_eph["r"][0]
+    saturn = Horizons(id="699", location="399", epochs=AJD)
+    saturn_eph = saturn.ephemerides()
+    saturn_hlon = saturn_eph["EclLon"][0]
+    saturn_r = saturn_eph["r"][0]
+    uranus = Horizons(id="799", location="399", epochs=AJD)
+    uranus_eph = uranus.ephemerides()
+    uranus_hlon = uranus_eph["EclLon"][0]
+    uranus_r = uranus_eph["r"][0]
+    neptune = Horizons(id="899", location="399", epochs=AJD)
+    neptune_eph = neptune.ephemerides()
+    neptune_hlon = neptune_eph["EclLon"][0]
+    neptune_r = neptune_eph["r"][0]
+    # Earth
+    earth = ephem.Sun()  # special rule: ask the hlon of the Sun you get the Earth
+    earth.compute(arrival_UTC)
+    earth_hlon = np.rad2deg(earth.hlon)
+    earth_r = 1.0
+
+    # Spacecrafts
+
+    # Parker Solar Probe
+    try:
+        PSP = Horizons(id="-96", location="399", epochs=AJD)
+        PSP_eph = PSP.ephemerides()
+        PSP_hlon = PSP_eph["EclLon"][0]
+        PSP_r = PSP_eph["r"][0]
+        ax.plot(
+            np.deg2rad(PSP_hlon),
+            PSP_r,
+            "d",
+            markerfacecolor="black",
+            markeredgecolor="black",
+            label="Parker SP",
+            markersize=10,
+            linewidth=6,
+        )
+    except:
+        print("NO PSP")
+
+    # Solar Orbiter
+    try:
+        SolO = Horizons(id="-144", location="399", epochs=AJD)
+        SolO_eph = SolO.ephemerides()
+        SolO_hlon = SolO_eph["EclLon"][0]
+        SolO_r = SolO_eph["r"][0]
+        ax.plot(
+            np.deg2rad(SolO_hlon),
+            SolO_r,
+            "d",
+            markerfacecolor="blue",
+            markeredgecolor="black",
+            label="Solar Orbiter",
+            markersize=10,
+            linewidth=6,
+        )
+
+    except:
+        print("NO SolO")
+
+    # Bepi Colombo
+    try:
+        BepCo = Horizons(id="-121", location="399", epochs=AJD)
+        BepCo_eph = BepCo.ephemerides()
+        BepCo_hlon = BepCo_eph["EclLon"][0]
+        BepCo_r = BepCo_eph["r"][0]
+        ax.plot(
+            np.deg2rad(BepCo_hlon),
+            BepCo_r,
+            "d",
+            markerfacecolor="grey",
+            markeredgecolor="black",
+            label="Bepicolombo",
+            markersize=10,
+            linewidth=6,
+        )
+
+    except:
+        print("NO Bepi Colombo")
+
+    # STEREO-A
+    try:
+        STA = Horizons(id="-234", location="399", epochs=AJD)
+        STA_eph = STA.ephemerides()
+        STA_hlon = STA_eph["EclLon"][0]
+        STA_r = STA_eph["r"][0]
+        ax.plot(
+            np.deg2rad(STA_hlon),
+            STA_r,
+            "d",
+            markerfacecolor="orange",
+            markeredgecolor="black",
+            label="STEREO-A",
+            markersize=10,
+            linewidth=6,
+        )
+
+    except:
+        print("NO ST-A")
+
+    # STEREO-B
+    try:
+        STB = Horizons(id="-235", location="399", epochs=AJD)
+        STB_eph = STB.ephemerides()
+        STB_hlon = STB_eph["EclLon"][0]
+        STB_r = STB_eph["r"][0]
+        ax.plot(
+            np.deg2rad(STB_hlon),
+            STB_r,
+            "d",
+            markerfacecolor="Red",
+            markeredgecolor="black",
+            label="STEREO-B",
+            markersize=10,
+            linewidth=6,
+        )
+
+    except:
+        print("NO ST-B")
+
+    # Main program for the plot
+
+    Max_AU = 2.0
+    if r_target < 2.0:
+        Max_AU = 2.0
+        planet_list = ["Mercury", "Venus", "Earth", "Mars"]
+        Coord_list = [mercury_hlon, venus_hlon, earth_hlon, mars_hlon]
+        distance_list = [mercury_r, venus_r, earth_r, mars_r]
+        for this_planet, this_coord, this_dist in zip(
+            planet_list, Coord_list, distance_list
+        ):
+            ax.plot(
+                np.deg2rad(this_coord), this_dist, "o", label=this_planet, markersize=13
+            )
+    elif r_target < 6.0:
+        Max_AU = 6.0
+        planet_list = ["Mercury", "Venus", "Earth", "Mars", "Jupiter"]
+        Coord_list = [mercury_hlon, venus_hlon, earth_hlon, mars_hlon, jupiter_hlon]
+        distance_list = [mercury_r, venus_r, earth_r, mars_r, jupiter_r]
+        for this_planet, this_coord, this_dist in zip(
+            planet_list, Coord_list, distance_list
+        ):
+            ax.plot(
+                np.deg2rad(this_coord), this_dist, "o", label=this_planet, markersize=13
+            )
+    elif r_target < 11.0:
+        Max_AU = 11.0
+        planet_list = ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn"]
+        Coord_list = [
+            mercury_hlon,
+            venus_hlon,
+            earth_hlon,
+            mars_hlon,
+            jupiter_hlon,
+            saturn_hlon,
+        ]
+        distance_list = [mercury_r, venus_r, earth_r, mars_r, jupiter_r, saturn_r]
+        for this_planet, this_coord, this_dist in zip(
+            planet_list, Coord_list, distance_list
+        ):
+            ax.plot(
+                np.deg2rad(this_coord), this_dist, "o", label=this_planet, markersize=13
+            )
+    else:
+        Max_AU = 31.0
+        planet_list = [
+            "Mercury",
+            "Venus",
+            "Earth",
+            "Mars",
+            "Jupiter",
+            "Saturn",
+            "Uranus",
+            "Neptune",
+        ]
+        Coord_list = [
+            mercury_hlon,
+            venus_hlon,
+            earth_hlon,
+            mars_hlon,
+            jupiter_hlon,
+            saturn_hlon,
+            uranus_hlon,
+            neptune_hlon,
+        ]
+        distance_list = [
+            mercury_r,
+            venus_r,
+            earth_r,
+            mars_r,
+            jupiter_r,
+            saturn_r,
+            uranus_r,
+            neptune_r,
+        ]
+        for this_planet, this_coord, this_dist in zip(
+            planet_list, Coord_list, distance_list
+        ):
+            ax.plot(
+                np.deg2rad(this_coord), this_dist, "o", label=this_planet, markersize=10
+            )
+
+    # Main part to plot CME in Heliosphere
+    if pdbm == True:
+        ax.axvline(np.deg2rad(np.median(phi_cme + omega)), color="r", ls="-")
+        ax.axvline(np.deg2rad(np.median(phi_cme - omega)), color="r", ls="-")
+        theta_ensemble, r_ensemble = CME_edge_ensemble(
+            tt, r0, v0, gamma, w, omega, phi_cme, cone_geometry, kinematic
+        )
+        for i in range(0, len(theta_ensemble)):
+            ax.plot(theta_ensemble[i], r_ensemble[i], "r-", alpha=0.01)
+
+    else:
+        ax.axvline(np.deg2rad(phi_cme + omega), color="r", ls="-")
+        ax.axvline(np.deg2rad(phi_cme - omega), color="r", ls="-")
+        theta, r = CME_edge(
+            tt, r0, v0, gamma, w, omega, phi_cme, cone_geometry, kinematic
+        )
+        ax.plot(theta, r, "r-", label="CME")
+
+    ax.set_rticks(np.linspace(0.0, Max_AU, 5))
+    ax.plot(0, 0, "*", markersize=25, color="orange", label="Sun")
+    ax.legend(loc="center left", bbox_to_anchor=(1.05, 0.5), fontsize=14)
+    ax.plot(np.deg2rad(phi_target), r_target, "x", markersize=10)
+    ax.text(np.deg2rad(phi_target), r_target, "Target", fontsize=12, va="top")
+    ax.axvline(np.deg2rad(phi_target))
+
+    # Save the plot to an in-memory buffer
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png", dpi=600, bbox_inches="tight")
+    buffer.seek(0)  # Move to the start of the buffer
+    plt.close()  # Close the plot to free resources
+
+    return buffer
